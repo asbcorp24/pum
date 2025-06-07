@@ -1,0 +1,55 @@
+#include "ArchiveManager.h"
+
+void ArchiveManager::begin() {
+    EEPROM.begin(EEPROM_SIZE);
+    write_index = 0; // можно загрузить из EEPROM, если нужно сохранять между перезагрузками
+}
+
+void ArchiveManager::add(const ArchiveRecord& record) {
+    writeRecord(write_index, record);
+    write_index = (write_index + 1) % MAX_RECORDS;
+    EEPROM.commit();
+}
+
+void ArchiveManager::writeRecord(uint16_t index, const ArchiveRecord& record) {
+    int addr = index * RECORD_SIZE;
+    EEPROM.put(addr, record);
+}
+
+bool ArchiveManager::readRecord(uint16_t index, ArchiveRecord& record) {
+    if (index >= MAX_RECORDS) return false;
+    int addr = index * RECORD_SIZE;
+    EEPROM.get(addr, record);
+    return true;
+}
+
+bool ArchiveManager::getNextPending(ArchiveRecord& record) {
+    for (uint16_t i = 0; i < MAX_RECORDS; i++) {
+        ArchiveRecord r;
+        if (readRecord(i, r)) {
+            if (r.status == 0) { // pending
+                record = r;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void ArchiveManager::updateStatus(uint16_t index, uint8_t status) {
+    ArchiveRecord record;
+    if (!readRecord(index, record)) return;
+    record.status = status;
+    writeRecord(index, record);
+    EEPROM.commit();
+}
+
+void ArchiveManager::dumpAll(Stream& out) {
+    for (uint16_t i = 0; i < MAX_RECORDS; i++) {
+        ArchiveRecord r;
+        if (readRecord(i, r)) {
+            out.printf("ID: %lu, Time: %lu, Volume: %.2f, Status: %u\n",
+                       r.cow_id, r.timestamp, r.volume, r.status);
+        }
+    }
+}
