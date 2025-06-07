@@ -23,14 +23,14 @@ bool ArchiveManager::readRecord(uint16_t index, ArchiveRecord& record) {
     return true;
 }
 
-bool ArchiveManager::getNextPending(ArchiveRecord& record) {
+bool ArchiveManager::getNextPending(uint16_t &outIndex, ArchiveRecord &outRec) {
+    // Перебираем все возможные индексы
     for (uint16_t i = 0; i < MAX_RECORDS; i++) {
         ArchiveRecord r;
-        if (readRecord(i, r)) {
-            if (r.status == 0) { // pending
-                record = r;
-                return true;
-            }
+        if (readRecord(i, r) && r.status == 0) {  // 0 = pending
+            outIndex = i;
+            outRec   = r;
+            return true;
         }
     }
     return false;
@@ -48,8 +48,7 @@ void ArchiveManager::dumpAll(Stream& out) {
     for (uint16_t i = 0; i < MAX_RECORDS; i++) {
         ArchiveRecord r;
         if (readRecord(i, r)) {
-            out.printf("ID: %lu, Time: %lu, Volume: %.2f, Status: %u\n",
-                       r.cow_id, r.timestamp, r.volume, r.status);
+            out.printf("ID: %lu, Time: %lu, Volume: %.2f, EC: %.2f, Status: %u\n",r.cow_id, r.timestamp, r.volume, r.ec, r.status);
         }
     }
 }

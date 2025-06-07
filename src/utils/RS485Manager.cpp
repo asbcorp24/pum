@@ -56,95 +56,179 @@ uint8_t RS485Manager::_calcCRC8(const uint8_t* data, size_t len) const {
 bool RS485Manager::sendPacket(const RS485Packet& pkt) {
     if (!_serial) return false;
 
-    uint8_t payload[17];
+    const size_t PAYLOAD_LEN = 20;
+    uint8_t payload[PAYLOAD_LEN];
     size_t idx = 0;
 
-    payload[idx++] = pkt.client_id;
+    // 1) client_id (4 байта, big-endian)
+    payload[idx++] = (pkt.client_id >> 24) & 0xFF;
+    payload[idx++] = (pkt.client_id >> 16) & 0xFF;
+    payload[idx++] = (pkt.client_id >>  8) & 0xFF;
+    payload[idx++] = (pkt.client_id >>  0) & 0xFF;
 
-    uint32_t cow = pkt.cow_id;
-    payload[idx++] = (cow >> 24) & 0xFF;
-    payload[idx++] = (cow >> 16) & 0xFF;
-    payload[idx++] = (cow >> 8) & 0xFF;
-    payload[idx++] = (cow >> 0) & 0xFF;
+    // 2) cow_id (4 байта, big-endian)
+    payload[idx++] = (pkt.cow_id >> 24) & 0xFF;
+    payload[idx++] = (pkt.cow_id >> 16) & 0xFF;
+    payload[idx++] = (pkt.cow_id >>  8) & 0xFF;
+    payload[idx++] = (pkt.cow_id >>  0) & 0xFF;
 
-    memcpy(&payload[idx], &pkt.liters, 4);
-    idx += 4;
+    // 3) liters (4 байта, IEEE754 little-endian)
+    uint8_t* pLit = (uint8_t*)&pkt.liters;
+    payload[idx++] = pLit[0];
+    payload[idx++] = pLit[1];
+    payload[idx++] = pLit[2];
+    payload[idx++] = pLit[3];
 
-    uint32_t ts = pkt.timestamp;
-    payload[idx++] = (ts >> 24) & 0xFF;
-    payload[idx++] = (ts >> 16) & 0xFF;
-    payload[idx++] = (ts >> 8) & 0xFF;
-    payload[idx++] = (ts >> 0) & 0xFF;
+    // 4) timestamp (4 байта, big-endian)
+    payload[idx++] = (pkt.timestamp >> 24) & 0xFF;
+    payload[idx++] = (pkt.timestamp >> 16) & 0xFF;
+    payload[idx++] = (pkt.timestamp >>  8) & 0xFF;
+    payload[idx++] = (pkt.timestamp >>  0) & 0xFF;
 
-    memcpy(&payload[idx], &pkt.ec, 4);
-    idx += 4;
+    // 5) ec (4 байта, IEEE754 little-endian)
+    uint8_t* pEc = (uint8_t*)&pkt.ec;
+    payload[idx++] = pEc[0];
+    payload[idx++] = pEc[1];
+    payload[idx++] = pEc[2];
+    payload[idx++] = pEc[3];
 
-    if (idx != 17) return false;
+    // Проверяем, что мы упаковали ровно 20 байт
+    if (idx != PAYLOAD_LEN) return false;
 
-    uint8_t packet[1 + 1 + 17 + 1 + 1];
-    size_t pidx = 0;
-    packet[pidx++] = 0xAA;
-    packet[pidx++] = 17;
-    memcpy(&packet[pidx], payload, 17);
-    pidx += 17;
+    // Собираем весь пакет: [Start|Len|payload|CRC|End]
+    uint8_t packet[1 + 1 + PAYLOAD_LEN + 1 + 1];
+    size_t p = 0;
+    packet[p++] = 0xAA;
+    packet[p++] = PAYLOAD_LEN;
+    memcpy(&packet[p], payload, PAYLOAD_LEN);
+    p += PAYLOAD_LEN;
+    uint8_t crc = _calcCRC8(packet, 2 + PAYLOAD_LEN);
+    packet[p++] = crc;
+    packet[p++] = 0x55;
 
-    uint8_t crc = _calcCRC8(packet, 1 + 1 + 17);
-    packet[pidx++] = crc;
-    packet[pidx++] = 0x55;
-
+    // TX → send → RX
     _enableTransmit();
-    _serial->write(packet, pidx);
+    _serial->write(packet, p);
     _serial->flush();
     _enableReceive();
 
     return true;
 }
 
+bool RS485Manager::sendRaw(const uint8_t* buf, size_t len) {
+    if (!_serial) return false;
+    size_t total = 1 + 1 + len + 1 + 1;
+    uint8_t* pkt = (uint8_t*)malloc(total);
+    if (!pkt) return false;
+
+    size_t i = 0;
+    pkt[i++] = 0xAA;          // Start
+    pkt[i++] = (uint8_t)len;  // Length
+    memcpy(pkt + i, buf, len);
+    i += len;
+    uint8_t crc = _calcCRC8(pkt, 2 + len);
+    pkt[i++] = crc;           // CRC
+    pkt[i++] = 0x55;          // End
+
+    _enableTransmit();
+    _serial->write(pkt, total);
+    _serial->flush();
+    _enableReceive();
+
+    free(pkt);
+    return true;
+}
+
+bool RS485Manager::readRaw(uint8_t* outBuf, size_t& outLen) {
+    if (!_serial) return false;
+    uint32_t start = millis();
+    // Ждём Start
+    while (millis() - start < _timeout) {
+        if (_serial->available() && _serial->read() == 0xAA) break;
+    }
+    if (millis() - start >= _timeout) return false;
+
+    // Читаем Length
+    uint8_t len;
+    if (!_serial->readBytes(&len, 1)) return false;
+    outLen = len;
+    if (len > 250) return false; // защита
+
+    // Читаем payload
+    if (_serial->readBytes(outBuf, len) < len) return false;
+
+    // Читаем CRC
+    uint8_t recvCrc = 0;
+    if (!_serial->readBytes(&recvCrc, 1)) return false;
+
+    // Читаем End
+    uint8_t endByte = 0;
+    if (!_serial->readBytes(&endByte, 1) || endByte != 0x55) return false;
+
+    // Проверяем CRC
+    uint8_t* tmp = (uint8_t*)malloc(2 + len);
+    tmp[0] = 0xAA;
+    tmp[1] = len;
+    memcpy(tmp + 2, outBuf, len);
+    uint8_t calc = _calcCRC8(tmp, 2 + len);
+    free(tmp);
+    return calc == recvCrc;
+}
 // Чтение и парсинг одного полного пакета
 bool RS485Manager::readPacket(RS485Packet& out_pkt) {
     if (!_serial) return false;
-    uint32_t startTime = millis();
+    uint32_t start = millis();
 
-    while (millis() - startTime < _timeout) {
+    // 1) Ждём Start
+    while (millis() - start < _timeout) {
         if (_serial->available() && _serial->read() == 0xAA) break;
     }
-    if (millis() - startTime >= _timeout) return false;
+    if (millis() - start >= _timeout) return false;
 
-    uint8_t length = 0;
+    // 2) Читаем Length
+    uint8_t length;
     if (!_serial->readBytes(&length, 1)) return false;
-    if (length != 17) return false;
+    if (length != 20) return false;  // теперь 20 байт payload!
 
-    uint8_t payload[17];
-    if (_serial->readBytes(payload, 17) < 17) return false;
+    // 3) Читаем payload
+    uint8_t payload[20];
+    if (_serial->readBytes(payload, 20) < 20) return false;
 
-    uint8_t receivedCRC = 0;
-    if (!_serial->readBytes(&receivedCRC, 1)) return false;
+    // 4) Читаем CRC и End
+    uint8_t recvCrc = 0, endByte = 0;
+    if (!_serial->readBytes(&recvCrc, 1)) return false;
+    if (_serial->readBytes(&endByte, 1) != 1 || endByte != 0x55) return false;
 
-    uint8_t endByte = 0;
-    if (!_serial->readBytes(&endByte, 1) == 0 || endByte != 0x55) return false;
+    // 5) Проверяем CRC
+    uint8_t tmp[2 + 20];
+    tmp[0] = 0xAA;
+    tmp[1] = 20;
+    memcpy(tmp + 2, payload, 20);
+    if (_calcCRC8(tmp, sizeof(tmp)) != recvCrc) return false;
 
-    uint8_t tmpForCRC[1 + 1 + 17];
-    tmpForCRC[0] = 0xAA;
-    tmpForCRC[1] = 17;
-    memcpy(&tmpForCRC[2], payload, 17);
-    if (_calcCRC8(tmpForCRC, sizeof(tmpForCRC)) != receivedCRC) return false;
+    // 6) Распаковываем
+    size_t i = 0;
+    out_pkt.client_id = ((uint32_t)payload[i++] << 24)
+                      | ((uint32_t)payload[i++] << 16)
+                      | ((uint32_t)payload[i++] <<  8)
+                      | ((uint32_t)payload[i++] <<  0);
 
-    size_t idx = 0;
-    out_pkt.client_id = payload[idx++];
+    out_pkt.cow_id = ((uint32_t)payload[i++] << 24)
+                   | ((uint32_t)payload[i++] << 16)
+                   | ((uint32_t)payload[i++] <<  8)
+                   | ((uint32_t)payload[i++] <<  0);
 
-    out_pkt.cow_id =  ((uint32_t)payload[idx++] << 24);
-    out_pkt.cow_id |= ((uint32_t)payload[idx++] << 16);
-    out_pkt.cow_id |= ((uint32_t)payload[idx++] << 8);
-    out_pkt.cow_id |= ((uint32_t)payload[idx++]);
+    memcpy(&out_pkt.liters, payload + i, 4);
+    i += 4;
 
-    memcpy(&out_pkt.liters, &payload[idx], 4); idx += 4;
+    out_pkt.timestamp = ((uint32_t)payload[i++] << 24)
+                      | ((uint32_t)payload[i++] << 16)
+                      | ((uint32_t)payload[i++] <<  8)
+                      | ((uint32_t)payload[i++] <<  0);
 
-    out_pkt.timestamp =  ((uint32_t)payload[idx++] << 24);
-    out_pkt.timestamp |= ((uint32_t)payload[idx++] << 16);
-    out_pkt.timestamp |= ((uint32_t)payload[idx++] << 8);
-    out_pkt.timestamp |= ((uint32_t)payload[idx++]);
-
-    memcpy(&out_pkt.ec, &payload[idx], 4); idx += 4;
+    memcpy(&out_pkt.ec, payload + i, 4);
+    i += 4;
 
     return true;
 }
+

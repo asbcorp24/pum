@@ -34,6 +34,20 @@ public:
      * @param dePin  Пин DE/RE для управления трансивером RS485.
      */
     void begin(uint8_t rxPin, uint8_t txPin, uint32_t baud, uint8_t dePin);
+   /* **
+    * @brief Отправить «сырые» данные по RS485, обёрнутые в Start/Len/CRC/End
+    */
+   bool sendRaw(const uint8_t* buf, size_t len);
+
+   /**
+    * @brief Прочитать «сырые» данные из RS485.
+    * @param outBuf Буфер для payload (без Start/Len/CRC/End).
+    * @param outLen Сюда запишется длина payload.
+    * @return true, если пакет успешно считан и CRC проверен.
+    */
+   bool readRaw(uint8_t* outBuf, size_t& outLen);
+
+
 
     /**
      * @brief Проверяет, есть ли хотя бы один полный пакет в буфере.

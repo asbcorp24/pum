@@ -5,9 +5,11 @@
 #include <EEPROM.h>
 
 struct ArchiveRecord {
+    uint8_t  client_id;   // номер ПУМ
     uint32_t cow_id;
     uint32_t timestamp;
     float    volume;
+    float    ec;       // электр.проводимость, мСм/см
     uint8_t  status; // 0 = pending, 1 = sent, 2 = error
 };
 
@@ -24,13 +26,14 @@ public:
      */
     void add(const ArchiveRecord& record);
 
-    /**
-     * @brief Получить следующую pending запись.
-     * @param record ссылка для возврата результата.
-     * @return true — если найдена запись, иначе false.
+     /**
+     * @brief Найти первую запись со статусом pending и вернуть её индекс.
+     * @param outIndex индекс найденной записи
+     * @param outRec   сама запись
+     * @return true, если такая запись есть
      */
-    bool getNextPending(ArchiveRecord& record);
-
+    bool getNextPending(uint16_t &outIndex, ArchiveRecord &outRec);
+    
     /**
      * @brief Обновить статус записи по индексу.
      * @param index индекс записи (0..MAX_RECORDS-1)

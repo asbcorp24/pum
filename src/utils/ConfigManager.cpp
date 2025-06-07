@@ -10,7 +10,7 @@ bool ConfigManager::hasSavedConfig()  {
 }
 
 // Проверяет, есть ли RS485 ID
-bool ConfigManager::hasSavedClientID() const {
+bool ConfigManager::hasSavedClientID() {
     return _prefs.isKey(KEY_RS485_ID);
 }
 
