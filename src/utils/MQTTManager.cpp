@@ -52,7 +52,7 @@ void MQTTManager::loop() {
     _mqttClient.loop();
 }
 
-bool MQTTManager::isConnected() const {
+bool MQTTManager::isConnected()  {
     return _mqttClient.connected();
 }
 

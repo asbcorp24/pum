@@ -4,7 +4,7 @@
 #include <LittleFS.h>
 #include <PubSubClient.h>
 #include <mongoose.h>
-#include <lvgl.h>
+ 
 #include "utils/ConfigManager.h"
 #include "utils/RS485Manager.h"
 #include "utils/MQTTManager.h"

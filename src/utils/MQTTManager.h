@@ -39,7 +39,7 @@ public:
     /**
      * @brief Проверка соединения
      */
-    bool isConnected() const;
+    bool isConnected();
 
     /**
      * @brief Отправка сообщения

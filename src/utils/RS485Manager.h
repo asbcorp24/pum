@@ -7,12 +7,14 @@
  * @brief Пакет данных (payload) для бинарного протокола RS485.
  */
 struct RS485Packet {
-    uint8_t  client_id;  ///< 1 байт
-    uint32_t cow_id;     ///< 4 байта
-    float    liters;     ///< 4 байта (IEEE-754)
-    uint32_t timestamp;  ///< 4 байта (Unix-time)
+    uint8_t client_id;
+    uint32_t cow_id;
+    float liters;
+    uint32_t timestamp;
+    float ec;
 
-    RS485Packet() : client_id(0), cow_id(0), liters(0), timestamp(0) {}
+    RS485Packet() 
+        : client_id(0), cow_id(0), liters(0.0f), timestamp(0), ec(0.0f) {}
 };
 
 /**

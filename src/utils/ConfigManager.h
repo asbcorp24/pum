@@ -36,7 +36,7 @@ public:
      * @return true, если и ключ "ssid", и ключ "password" присутствуют.
      * @return false, если один из ключей отсутствует.
      */
-    bool hasSavedConfig() const;
+    bool hasSavedConfig() ;
 
     /**
      * @brief Проверяет, сохранён ли RS485 Client ID (для Client Mode).
@@ -44,7 +44,7 @@ public:
      * @return true, если ключ "rs485_id" присутствует.
      * @return false, иначе.
      */
-    bool hasSavedClientID() const;
+    bool hasSavedClientID() ;
 
     /**
      * @brief Считывает SSID и пароль из Preferences в поля savedSSID и savedPassword.
@@ -59,49 +59,49 @@ public:
      * 
      * @return String — client ID (например, "A1").
      */
-    String getClientID() const;
+    String getClientID() ;
 
     /**
      * @brief Возвращает сохранённый baud rate для RS485.
      * 
      * @return uint32_t — скорость, например 9600.
      */
-    uint32_t getRS485Baud() const;
+    uint32_t getRS485Baud() ;
 
     /**
      * @brief Возвращает адрес MQTT-брокера (IP или hostname).
      * 
      * @return String — адрес брокера.
      */
-    String getMQTTServer() const;
+    String getMQTTServer() ;
 
     /**
      * @brief Возвращает порт MQTT-брокера.
      * 
      * @return uint16_t — порт, например 1883.
      */
-    uint16_t getMQTTPort() const;
+    uint16_t getMQTTPort() ;
 
     /**
      * @brief Возвращает логин для подключения к MQTT-брокеру.
      * 
      * @return String — имя пользователя.
      */
-    String getMQTTUser() const;
+    String getMQTTUser() ;
 
     /**
      * @brief Возвращает пароль для подключения к MQTT-брокеру.
      * 
      * @return String — пароль.
      */
-    String getMQTTPass() const;
+    String getMQTTPass() ;
 
     /**
      * @brief Возвращает базовый URL для REST API.
      * 
      * @return String — например "https://api.example.com".
      */
-    String getRESTURL() const;
+    String getRESTURL() ;
 
     /**
      * @brief Генерирует JSON-строку с текущими настройками.
@@ -121,7 +121,7 @@ public:
      * 
      * @return String — JSON с параметрами.
      */
-    String getConfigJSON() const;
+    String getConfigJSON() ;
 
     /**
      * @brief Парсит JSON-строку и сохраняет все поля в Preferences.
@@ -152,9 +152,9 @@ private:
 
     // Вспомогательные методы для чтения/записи отдельных ключей:
     void _saveString(const char* key, const String& value);
-    String _getString(const char* key, const String& defaultValue = "") const;
+    String _getString(const char* key, const String& defaultValue = "") ;
     void _saveUInt32(const char* key, uint32_t value);
-    uint32_t _getUInt32(const char* key, uint32_t defaultValue = 0) const;
+    uint32_t _getUInt32(const char* key, uint32_t defaultValue = 0) ;
 
     // Ключи в Preferences:
     static constexpr const char* KEY_SSID        = "ssid";

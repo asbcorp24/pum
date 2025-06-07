@@ -3,60 +3,72 @@
 
 #include <Arduino.h>
 
-/// Установи этот флаг, если данные приходят с STM
-//#define MILK_SENSOR_EXTERNAL_UART
-
-#ifdef MILK_SENSOR_EXTERNAL_UART
-#include <HardwareSerial.h>
-#endif
-
 class MilkSensor {
 public:
     /**
      * @brief Инициализация сенсора
-     * @param pulsePin — пин, подключенный к тахометру (если используется напрямую)
-     * @param litersPerPulse — коэффициент: сколько литров на 1 импульс
+     * @param pulsePin — пин тахометра
+     * @param litersPerPulse — сколько литров на один импульс
      */
-    void begin(uint8_t pulsePin = 4, float litersPerPulse = 0.0025f);
+    void begin(uint8_t pulsePin, float litersPerPulse);
 
     /**
-     * @brief Вызывается в loop() — обновляет скорость и объём
+     * @brief Установить аналоговый пин для EC-сенсора
+     * @param pin — аналоговый пин (например A0 или GPIO34)
+     * @param factor — коэффициент перевода из raw в мСм/см
+     */
+    void setECPin(uint8_t pin, float factor = 1.0f);
+
+    /**
+     * @brief Обновить данные (рассчитать объём, поток, EC)
      */
     void update();
 
     /**
-     * @brief Сброс накопленного значения (новая дойка)
+     * @brief Сбросить данные
      */
     void reset();
 
     /**
-     * @brief Получить объём, литры
+     * @return Общий объём молока в литрах
      */
     float getVolumeLiters() const;
 
     /**
-     * @brief Получить скорость потока, литров в секунду
+     * @return Скорость потока в литрах/секунду
      */
     float getFlowRateLps() const;
 
-private:
-#ifdef MILK_SENSOR_EXTERNAL_UART
-    HardwareSerial* _uart = nullptr;
-    String _uartBuffer;
-#else
-    static volatile uint32_t _pulseCount;
-    static void IRAM_ATTR onPulse();
-    uint8_t _pulsePin = 4;
-    float _litersPerPulse = 0.0025f;
+    /**
+     * @return Электропроводность в мСм/см
+     */
+    float getEC() const;
+
+#ifndef MILK_SENSOR_EXTERNAL_UART
+    static void IRAM_ATTR onPulse(); // для прерываний
 #endif
 
-    float _volumeLiters = 0.0;
-    float _flowRateLps = 0.0;
-    unsigned long _lastUpdate = 0;
-    uint32_t _lastPulseCount = 0;
-
+private:
+#ifndef MILK_SENSOR_EXTERNAL_UART
     void _updateFromPulseCounter();
+    static volatile uint32_t _pulseCount;
+    uint32_t _lastPulseCount = 0;
+    uint8_t _pulsePin;
+    float _litersPerPulse;
+#else
     void _updateFromUART();
+    HardwareSerial* _uart;
+    String _uartBuffer;
+#endif
+
+    unsigned long _lastUpdate = 0;
+    float _volumeLiters = 0.0f;
+    float _flowRateLps = 0.0f;
+
+    // EC sensor
+    uint8_t _ecPin = 255;
+    float _ecFactor = 1.0f;
+    float _ecValue = 0.0f;
 };
 
 #endif // MILK_SENSOR_H

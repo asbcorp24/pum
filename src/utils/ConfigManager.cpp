@@ -5,7 +5,7 @@ void ConfigManager::begin(const char* ns) {
 }
 
 // Проверяет, есть ли SSID и пароль
-bool ConfigManager::hasSavedConfig() const {
+bool ConfigManager::hasSavedConfig()  {
     return _prefs.isKey(KEY_SSID) && _prefs.isKey(KEY_PASSWORD);
 }
 
@@ -22,42 +22,42 @@ bool ConfigManager::getWiFiCredentials() {
 }
 
 // Возвращает Client ID (RS485)
-String ConfigManager::getClientID() const {
+String ConfigManager::getClientID()  {
     return _getString(KEY_RS485_ID, "");
 }
 
 // Возвращает скорость RS485
-uint32_t ConfigManager::getRS485Baud() const {
+uint32_t ConfigManager::getRS485Baud()  {
     return _getUInt32(KEY_RS485_BAUD, 9600);
 }
 
 // Возвращает MQTT сервер
-String ConfigManager::getMQTTServer() const {
+String ConfigManager::getMQTTServer()  {
     return _getString(KEY_MQTT_SERVER, "");
 }
 
 // Возвращает порт MQTT
-uint16_t ConfigManager::getMQTTPort() const {
+uint16_t ConfigManager::getMQTTPort()  {
     return static_cast<uint16_t>(_getUInt32(KEY_MQTT_PORT, 1883));
 }
 
 // Возвращает MQTT пользователь
-String ConfigManager::getMQTTUser() const {
+String ConfigManager::getMQTTUser()  {
     return _getString(KEY_MQTT_USER, "");
 }
 
 // Возвращает MQTT пароль
-String ConfigManager::getMQTTPass() const {
+String ConfigManager::getMQTTPass()  {
     return _getString(KEY_MQTT_PASS, "");
 }
 
 // Возвращает REST URL
-String ConfigManager::getRESTURL() const {
+String ConfigManager::getRESTURL()  {
     return _getString(KEY_REST_URL, "");
 }
 
 // Формирует JSON с текущими настройками
-String ConfigManager::getConfigJSON() const {
+String ConfigManager::getConfigJSON()  {
     // Оценим размер документа: 
     // SSID (~32), password (~64), rs485_id (~10), mqtt strings (~64), rest_url (~128)
     DynamicJsonDocument doc(512);
@@ -134,7 +134,7 @@ void ConfigManager::_saveString(const char* key, const String& value) {
 }
 
 // Читает строку из Preferences, если нет — возвращает defaultValue
-String ConfigManager::_getString(const char* key, const String& defaultValue) const {
+String ConfigManager::_getString(const char* key, const String& defaultValue)  {
     return _prefs.getString(key, defaultValue);
 }
 
@@ -144,6 +144,6 @@ void ConfigManager::_saveUInt32(const char* key, uint32_t value) {
 }
 
 // Читает uint32_t из Preferences, если нет — возвращает defaultValue
-uint32_t ConfigManager::_getUInt32(const char* key, uint32_t defaultValue) const {
+uint32_t ConfigManager::_getUInt32(const char* key, uint32_t defaultValue)  {
     return _prefs.getUInt(key, defaultValue);
 }
