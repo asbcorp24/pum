@@ -35,7 +35,29 @@ bool ArchiveManager::getNextPending(uint16_t &outIndex, ArchiveRecord &outRec) {
     }
     return false;
 }
-
+String ArchiveManager::getArchiveJson() {
+    String json = "[";
+    ArchiveRecord rec;
+    bool first = true;
+    // Перебираем все возможные слоты архива
+    for (uint16_t i = 0; i < MAX_RECORDS; i++) {
+        // readRecord у вас приватный, сделаем его публичным или друг — см. ниже
+        if (readRecord(i, rec)) {
+            if (!first) json += ",";
+            first = false;
+            json += "{";
+            json += "\"client_id\":" + String(rec.client_id) + ",";
+            json += "\"cow_id\":"    + String(rec.cow_id)    + ",";
+            json += "\"timestamp\":" + String(rec.timestamp) + ",";
+            json += "\"volume\":"    + String(rec.volume, 2) + ",";
+            json += "\"ec\":"        + String(rec.ec, 2)     + ",";
+            json += "\"status\":"    + String(rec.status);
+            json += "}";
+        }
+    }
+    json += "]";
+    return json;
+}
 void ArchiveManager::updateStatus(uint16_t index, uint8_t status) {
     ArchiveRecord record;
     if (!readRecord(index, record)) return;

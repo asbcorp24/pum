@@ -311,46 +311,46 @@ void serverRS485Task(void *pvParameters) {
 void serverMQTTTask(void *pvParameters) {
   (void)pvParameters;
   for (;;) {
-      if (serverState == SERVER_ONLINE && wifiConnected) {
-          unsigned long now = millis();
-          // Если пора шлём **только одну** запись
-          if (now - lastMQTTSend > MQTT_SEND_INTERVAL) {
-              lastMQTTSend = now;
-              
-              ArchiveRecord rec;
-              uint16_t      idx;
-              // 1) Найти первую pending-запись
-              if (archiveMgr.getNextPending(idx, rec)) {
-                  // 2) Сформировать топик и payload
-                  String topic   = "milk/record/" + String(rec.cow_id);
-                  String payload = String("{")
-                                 + "\"cow_id\":"   + String(rec.cow_id)   + ","
-                                 + "\"timestamp\":" + String(rec.timestamp) + ","
-                                 + "\"volume\":"    + String(rec.volume, 2)
-                                 + "}";
+    if (serverState == SERVER_ONLINE && wifiConnected) {
+      unsigned long now = millis();
+      if (now - lastMQTTSend > MQTT_SEND_INTERVAL) {
+        lastMQTTSend = now;
 
-                  // 3) Убедиться, что MQTT-соединение живо
-                  if (!mqttClient.isConnected()) {
-                      mqttClient.connect();
-                  }
-                  // 4) Попытаться отправить
-                  bool ok = mqttClient.publish(topic, payload);
-                  if (ok) {
-                      // 5) Пометить запись как sent (1)
-                      archiveMgr.updateStatus(idx, 1);
-                      Serial.printf("[ServerMQTT] sent idx=%u cow=%lu\n",
-                                    idx, rec.cow_id);
-                  } else {
-                      Serial.printf("[ServerMQTT] failed idx=%u\n", idx);
-                  }
-              }
+        ArchiveRecord rec;
+        uint16_t      idx;
+        // 1) Ищем первую pending-запись
+        if (archiveMgr.getNextPending(idx, rec)) {
+          // 2) Формируем MQTT-топик и JSON с клиентом и ec
+          String topic = "milk/pum/" + String(rec.client_id) + "/record";
+          String payload = String("{")
+            + "\"pum_id\":"   + String(rec.client_id)    + ","
+            + "\"cow_id\":"   + String(rec.cow_id)       + ","
+            + "\"timestamp\":" + String(rec.timestamp)   + ","
+            + "\"volume\":"    + String(rec.volume,2)    + ","
+            + "\"ec\":"        + String(rec.ec,2)
+            + "}";
+
+          // 3) Проверяем соединение
+          if (!mqttClient.isConnected()) {
+            mqttClient.connect();
           }
-          // Всегда дергаем loop()
-          mqttClient.loop();
+
+          // 4) Публикуем и помечаем
+          if (mqttClient.publish(topic, payload)) {
+            archiveMgr.updateStatus(idx, /*1=*/1);
+            Serial.printf("[ServerMQTT] sent idx=%u pum=%u\n",
+                          idx, rec.client_id);
+          } else {
+            Serial.printf("[ServerMQTT] fail idx=%u\n", idx);
+          }
+        }
       }
-      vTaskDelay(pdMS_TO_TICKS(100));
+      mqttClient.loop();
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
+
 // -----------------------------------------------------------------------------
 // === Задача: LVGL-обновление экрана (Server) ===
 void serverDisplayTask(void *pvParameters) {
@@ -470,7 +470,7 @@ void clientRFIDTask(void *pvParameters) {
 
 // -----------------------------------------------------------------------------
 // === Задача: измерение молока (Client) ===
-void clientMilkTask(void *pvParameters) {
+/*void clientMilkTask(void *pvParameters) {
   (void) pvParameters;
   for (;;) {
     if (clientState == CLIENT_SCANNING) {
@@ -495,10 +495,57 @@ void clientMilkTask(void *pvParameters) {
     }
     vTaskDelay(pdMS_TO_TICKS(200));
   }
+}*/
+void clientMilkTask(void *pvParameters) {
+  (void)pvParameters;
+  for (;;) {
+    if (clientState == CLIENT_SCANNING) {
+      // 1) Берём последний отсканированный ID
+      String cow_id = lastCowID;
+
+      // 2) Сбрасываем предыдущие данные и начинаем измерение заново
+      milkSensor.reset();
+      displayMgr.showMessage("Measuring milk...");
+
+      // 3) Делаем пару циклов обновления сенсора
+      //    (реальную логику «блокировки» замените на вашу)
+      for (int i = 0; i < 50; ++i) {
+        milkSensor.update();
+        vTaskDelay(pdMS_TO_TICKS(100));
+      }
+
+      // 4) Получаем итоговый объём
+      float volume = milkSensor.getVolumeLiters();
+      lastVolume = volume;  // сохраняем для дисплея
+
+      Serial.printf("[ClientMilk] Measured %.2f L for cow_id=%s\n",
+                    volume, cow_id.c_str());
+
+      // 5) Сохраняем запись в локальный архив
+      //    Пример структуры ArchiveRecord: client_id, cow_id, timestamp, volume, ec, status
+      ArchiveRecord rec {
+        /*client_id=*/ (uint8_t)cfgManager.getClientID().toInt(),
+        /*cow_id   =*/ cow_id.toInt(),
+        /*timestamp */ (uint32_t)(millis() / 1000),
+        /*volume   =*/ volume,
+        /*ec       =*/ 0.0f,
+        /*status   =*/ 0
+      };
+      archiveMgr.add(rec);
+
+      // 6) Выводим результат
+      displayMgr.showMessage("Done: " + String(volume,2) + " L");
+
+      // 7) Переходим к отправке
+      clientState = CLIENT_MEASURING;
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+  }
 }
 
 // -----------------------------------------------------------------------------
 // === Задача: RS485-передача записей (Client) ===
+/*
 void clientRS485Task(void *pvParameters) {
   (void)pvParameters;
 
@@ -545,9 +592,56 @@ void clientRS485Task(void *pvParameters) {
       vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
+  */
+
+  void clientRS485Task(void *pvParameters) {
+    (void)pvParameters;
+  
+    for (;;) {
+      // 1) Сначала обработка OTA (если придут пакеты прошивки)
+      otaReceiver->handle();
+  
+      // 2) Если нужно отправлять
+      if (clientState == CLIENT_MEASURING || clientState == CLIENT_SENDING) {
+        if (rs485.isConnected()) {
+          // 2.1) Ищем первую pending-запись
+          uint16_t idx;
+          ArchiveRecord rec;
+          if (archiveMgr.getNextPending(idx, rec)) {
+            // 2.2) Формируем пакет
+            RS485Packet pkt;
+            pkt.client_id = (uint32_t)cfgManager.getClientID().toInt(); 
+            pkt.cow_id    = rec.cow_id;
+            pkt.liters    = rec.volume;
+            pkt.timestamp = rec.timestamp;
+            pkt.ec        = rec.ec;
+  
+            // 2.3) Отправляем
+            if (rs485.sendPacket(pkt)) {
+              // 2.4) Помечаем как sent
+              archiveMgr.updateStatus(idx, /*1=*/1);
+              Serial.printf("[ClientRS485] Sent idx=%u cow=%lu\n",
+                            idx, rec.cow_id);
+            } else {
+              Serial.printf("[ClientRS485] Fail to send idx=%u\n", idx);
+            }
+          }
+          // вернёмся в idle
+          clientState = CLIENT_IDLE;
+        } else {
+          // 2.5) RS485 всё ещё недоступен
+          displayMgr.showMessage("RS485 disconnected");
+          clientState = CLIENT_SENDING;
+        }
+      }
+  
+      // 3) Небольшая пауза
+      vTaskDelay(pdMS_TO_TICKS(500));
+    }
+  }
 // -----------------------------------------------------------------------------
 // === Задача: LVGL-обновление экрана (Client) ===
-void clientDisplayTask(void *pvParameters) {
+/*void clientDisplayTask(void *pvParameters) {
   (void) pvParameters;
   for (;;) {
     // 1) Считаем количество pending-записей в архиве
@@ -560,9 +654,9 @@ void clientDisplayTask(void *pvParameters) {
 
     // 2) Показываем на экране: кол-во клиентов, последний ID и объём
     displayMgr.showClientStatus(
-      /*clientCount=*/pendingCount,
-      /*lastCowId=*/ lastCowID,
-      /*lastVolume=*/ lastVolume
+       pendingCount,
+       lastCowID,
+        lastVolume
     );
 
     // 3) Оновление дисплея вместо loop()
@@ -571,7 +665,34 @@ void clientDisplayTask(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500)); // обновляем раз в полсекунды
   }
 }
+*/
+void clientDisplayTask(void *pvParameters) {
+  (void) pvParameters;
+  for (;;) {
+    // 1) Считаем количество pending-записей в архиве
+    uint16_t pendingCount = 0;
+    ArchiveRecord rec;
+    uint16_t    idx;
 
+    // правильно: передаём два аргумента — индекс и запись
+    while (archiveMgr.getNextPending(idx, rec)) {
+      pendingCount++;
+    }
+
+    // 2) Показываем на экране: кол-во записей в ожидании, последний ID и объём
+    // Клиентский счётчик — uint8_t, поэтому можно привести:
+    displayMgr.showClientStatus(
+      /*clientCount=*/ (uint8_t)pendingCount,
+      /*lastCowId=*/   lastCowID,
+      /*lastVolume=*/  lastVolume
+    );
+
+    // 3) Обновление дисплея
+    displayMgr.update();
+
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+}
 // -----------------------------------------------------------------------------
 // === Обработчик HTTP-запросов Mongoose (для обоих режимов) ===
 void mongooseEventHandler(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
@@ -601,8 +722,13 @@ void mongooseEventHandler(struct mg_connection *c, int ev, void *ev_data, void *
       }
     }
     else if (mg_http_match_uri(hm, "/api/exportArchive")) {
-      String archiveJson = archiveMgr.getServerArchiveJSON();
-      mg_http_reply(c, 200, "Content-Type: application/json\r\n", "%s", archiveJson.c_str());
+      // получаем JSON всего архива
+      String archiveJson = archiveMgr.getArchiveJson();
+      mg_http_reply(c,
+                    200,
+                    "Content-Type: application/json\r\n",
+                    "%s",
+                    archiveJson.c_str());
     }
     else {
       mg_http_reply(c, 404, "", "Not Found");
