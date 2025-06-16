@@ -1,24 +1,28 @@
-#ifndef DISPLAY_MANAGER_H
-#define DISPLAY_MANAGER_H
+#pragma once
 
 #include <Arduino.h>
-
-// forward declaration (если ты используешь LVGL или другой дисплейный стек)
-class TFT_eSPI;
+#include <bb_spi_lcd.h>
 
 class DisplayManager {
 public:
-    DisplayManager();
+  // Инициализация дисплея
+  void begin();
 
-    void begin(); // инициализация дисплея и LVGL
+  // Заставка при старте (Client/Server)
+  void showStartupScreen(const String &mode);
 
-    void showStartupScreen(const String& mode);
-    void showWiFiStatus(const String& ssid, const String& ip, bool connected);
-    void showClientStatus(uint8_t clientCount, const String& lastCowId, float lastVolume);
-    void showSensorData(float volume, float flowRate, float ec);
-    void showMessage(const String& msg, uint16_t color = 0xFFFF); // произвольное сообщение
+  // Статус Wi-Fi: SSID, IP, флаг соединения (true = STA, false = AP)
+  void showWiFiStatus(const String &ssid, const String &ip, bool connected);
 
-    void update(); // для вызова lv_timer_handler() или дисплейной отрисовки
+  // Произвольное сообщение (например: RS485-пакет)
+  void showMessage(const String &msg);
+
+  // Статус Client Mode: ID, последний cow ID, объём
+  void showClientStatus(uint32_t clientId, const String &cow, float volume);
+
+  // Нужен, чтобы в цикле вызывать обновление буфера (если используете backbuffer)
+  void update();
+
+private:
+  SPILCD lcd;
 };
-
-#endif // DISPLAY_MANAGER_H

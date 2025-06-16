@@ -104,12 +104,15 @@ void setup() {
   delay(500);
 
   // 2) Монтируем файловую систему (SPIFFS / LittleFS)
-  if (!LittleFS.begin()) {
-    Serial.println("Ошибка: не удалось смонтировать LittleFS");
-  }
+bool fs_ok = LittleFS.begin(/*formatIfFailed=*/ true);
+if (!fs_ok) {
+  Serial.println("FATAL: LittleFS не смонтировался даже после форматирования");
+  while (true) { vTaskDelay(pdMS_TO_TICKS(1000)); }  // останавливаемся
+}
+Serial.println("LittleFS смонтирован успешно");
 
   // 3) Считываем переключатель, чтобы определить режим
-  bool toggle = digitalRead(GPIO_TOGGLE_PIN);
+  bool toggle =1;// digitalRead(GPIO_TOGGLE_PIN);
 
   if (toggle) {
     systemMode = MODE_SERVER;
@@ -140,11 +143,13 @@ void startServerMode() {
   if (!cfgManager.hasSavedConfig()) {
     Serial.println("[Server] Настройки Wi-Fi/MQTT/REST/RS485 не найдены в Preferences.");
   }
-
+ Serial.println("Инициализация дисплея (LVGL)");
   // 2. Инициализация дисплея (LVGL)
-  displayMgr.begin();                      // Конфигурируем LVGL, дисплей
+  displayMgr.begin();         
+     Serial.println("Инициализация дисплея прошла успешно");             // Конфигурируем LVGL, дисплей
   //displayMgr.showSplash("Server Mode");    // Заставка
   displayMgr.showStartupScreen("Server Mode");
+
   // 3. Подключение к Wi-Fi (если есть сохранённые креды)
   bool gotSSID = cfgManager.getWiFiCredentials();
   if (gotSSID) {

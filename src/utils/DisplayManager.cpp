@@ -1,57 +1,93 @@
 #include "DisplayManager.h"
-#include <TFT_eSPI.h>
 
-TFT_eSPI tft = TFT_eSPI();  // глобальный объект дисплея
-
-DisplayManager::DisplayManager() {}
+// Задайте пины в соответствии с вашей платой!
+static constexpr int PIN_CS   = 5;
+static constexpr int PIN_DC   = 16;
+static constexpr int PIN_RST  = 4;
+static constexpr int PIN_BL   = 15;
+static constexpr int PIN_MOSI = 19;
+static constexpr int PIN_CLK  = 18;
+static constexpr int PIN_MISO = -1;  // не используем
 
 void DisplayManager::begin() {
-    tft.init();
-    tft.setRotation(1); // Повернуть при необходимости
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextSize(2);
-    tft.drawString("Display Init...", 10, 10);
-    delay(500);
+  // Инициализируем дисплей (пример для ST7789 240×135):
+  //   spilcdInit(lcd, тип, флаги, частота, CS, DC, MISO, RST, BL, MOSI, CLK)
+  spilcdInit(&lcd,
+              LCD_ST7789_135,
+              FLAGS_NONE,
+              40000000,
+              PIN_CS, PIN_DC, PIN_MISO,
+              PIN_RST, PIN_BL,
+              PIN_MOSI, PIN_CLK);
+
+  // Поворачиваем на 90°
+  spilcdSetOrientation(&lcd, LCD_ORIENTATION_90);
+
+  // Выделяем back-buffer (если позволяет память)
+#ifndef __AVR__
+  spilcdAllocBackbuffer(&lcd);
+#endif
+
+  // Заливаем всё чёрным
+  spilcdFill(&lcd, 0, DRAW_TO_LCD);
 }
 
-void DisplayManager::showStartupScreen(const String& mode) {
-    tft.fillScreen(TFT_BLACK);
-    tft.drawString("Milk Tracker", 10, 10);
-    tft.drawString("Mode:", 10, 40);
-    tft.drawString(mode, 80, 40);
+void DisplayManager::showStartupScreen(const String &mode) {
+  // Чистим экран
+  spilcdFill(&lcd, 0, DRAW_TO_LCD);
+
+  // Выводим текст
+  char buf[32];
+  mode.toCharArray(buf, sizeof(buf));
+  spilcdWriteString(&lcd, 20,  60, "Starting:",   0xFFFF, 0x0000, FONT_8x8, DRAW_TO_LCD);
+  spilcdWriteString(&lcd, 20,  80, buf,          0x07E0, 0x0000, FONT_8x8, DRAW_TO_LCD);
 }
 
-void DisplayManager::showWiFiStatus(const String& ssid, const String& ip, bool connected) {
-    tft.fillScreen(TFT_BLACK);
-    tft.drawString("Wi-Fi Status", 10, 10);
-    tft.drawString("SSID: " + ssid, 10, 40);
-    tft.drawString("IP: " + ip, 10, 70);
-    tft.drawString("State: " + String(connected ? "Connected" : "Disconnected"), 10, 100);
+void DisplayManager::showWiFiStatus(const String &ssid, const String &ip, bool connected) {
+  // Рисуем фон вверху
+  uint16_t bg = connected ? 0x001F : 0xF800;  // синий / красный
+  spilcdRectangle(&lcd, 0, 0, 240, 20, bg, bg, 1, DRAW_TO_LCD);
+
+  // Пишем SSID
+  char buf[32];
+  ssid.toCharArray(buf, sizeof(buf));
+  spilcdWriteString(&lcd, 5, 2, connected ? "WiFi:" : "AP:", 0xFFFF, bg, FONT_8x8, DRAW_TO_LCD);
+  spilcdWriteString(&lcd, 40, 2, buf, 0xFFFF, bg, FONT_8x8, DRAW_TO_LCD);
+
+  // Пишем IP ниже
+  ip.toCharArray(buf, sizeof(buf));
+  spilcdWriteString(&lcd, 5, 12, buf, 0xFFFF, bg, FONT_8x8, DRAW_TO_LCD);
 }
 
-void DisplayManager::showClientStatus(uint8_t clientCount, const String& lastCowId, float lastVolume) {
-    tft.fillScreen(TFT_BLACK);
-    tft.drawString("Clients: " + String(clientCount), 10, 10);
-    tft.drawString("Last Cow ID: " + lastCowId, 10, 40);
-    tft.drawString("Volume: " + String(lastVolume, 2) + " L", 10, 70);
+void DisplayManager::showMessage(const String &msg) {
+  // Очищаем середину экрана
+  spilcdFill(&lcd, 0, DRAW_TO_LCD);
+
+  // Показываем строку
+  char buf[64];
+  msg.toCharArray(buf, sizeof(buf));
+  spilcdWriteString(&lcd, 5, 60, buf, 0xFFFF, 0x0000, FONT_8x8, DRAW_TO_LCD);
 }
 
-void DisplayManager::showSensorData(float volume, float flowRate, float ec) {
-    tft.fillScreen(TFT_BLACK);
-    tft.drawString("Milk Volume: " + String(volume, 2) + " L", 10, 10);
-    tft.drawString("Flow Rate: " + String(flowRate, 2) + " L/s", 10, 40);
-    tft.drawString("EC: " + String(ec, 2), 10, 70);
-}
+void DisplayManager::showClientStatus(uint32_t clientId, const String &cow, float volume) {
+  // Чистим экран
+  spilcdFill(&lcd, 0, DRAW_TO_LCD);
 
-void DisplayManager::showMessage(const String& msg, uint16_t color) {
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(color, TFT_BLACK);
-    tft.drawString(msg, 10, 10);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK); // вернуть обратно
+  char buf[32];
+  snprintf(buf, sizeof(buf), "Client ID: %u", clientId);
+  spilcdWriteString(&lcd,  5,  5, buf, 0x07E0, 0x0000, FONT_8x8, DRAW_TO_LCD);
+
+  cow.toCharArray(buf, sizeof(buf));
+  snprintf(buf + cow.length(), sizeof(buf) - cow.length(), "Cow: %s", buf);
+  spilcdWriteString(&lcd,  5, 20, buf, 0x07E0, 0x0000, FONT_8x8, DRAW_TO_LCD);
+
+  snprintf(buf, sizeof(buf), "Vol: %.2f L", volume);
+  spilcdWriteString(&lcd,  5, 35, buf, 0x07E0, 0x0000, FONT_8x8, DRAW_TO_LCD);
 }
 
 void DisplayManager::update() {
-    // Здесь можно вызывать lv_timer_handler() при использовании LVGL
-    // lv_timer_handler(); delay(5);
+  // если используете backbuffer, то тут нужно показать буфер:
+#ifndef __AVR__
+  spilcdShowBuffer(&lcd, 0, 0, 240, 135, DRAW_TO_LCD);
+#endif
 }
