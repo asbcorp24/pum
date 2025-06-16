@@ -127,36 +127,36 @@ struct apihandler_array {
   uint64_t (*sizer)(void);             // Array size, for data handlers only
 };
 
-struct attribute s_wifi_attributes[] = {
+static  struct attribute s_wifi_attributes[] = {
   {"passw", "string", NULL, offsetof(struct wifi, passw), 10, false},
   {"sid", "string", NULL, offsetof(struct wifi, sid), 10, false},
   {NULL, NULL, NULL, 0, 0, false}
 };
-struct attribute s_mqtt_attributes[] = {
+static struct attribute s_mqtt_attributes[] = {
   {"password", "string", NULL, offsetof(struct mqtt, password), 20, false},
   {"login", "string", NULL, offsetof(struct mqtt, login), 20, false},
   {"url", "string", NULL, offsetof(struct mqtt, url), 150, false},
   {NULL, NULL, NULL, 0, 0, false}
 };
-struct attribute s_rs485_attributes[] = {
+static struct attribute s_rs485_attributes[] = {
   {"id", "int", NULL, offsetof(struct rs485, id), 0, false},
   {NULL, NULL, NULL, 0, 0, false}
 };
-struct attribute s_uchet_attributes[] = {
+static struct attribute s_uchet_attributes[] = {
   {"kf", "double", NULL, offsetof(struct uchet, kf), 0, false},
   {NULL, NULL, NULL, 0, 0, false}
 };
-struct attribute s_rest_attributes[] = {
+static struct attribute s_rest_attributes[] = {
   {"token", "string", NULL, offsetof(struct rest, token), 20, false},
   {"url", "string", NULL, offsetof(struct rest, url), 100, false},
   {NULL, NULL, NULL, 0, 0, false}
 };
 
-struct apihandler_data s_apihandler_wifi = {{"wifi", "data", false, 0, 0, 0UL}, s_wifi_attributes, sizeof(struct wifi), (void (*)(void *)) glue_get_wifi, (void (*)(void *)) glue_set_wifi};
-struct apihandler_data s_apihandler_mqtt = {{"mqtt", "data", false, 0, 0, 0UL}, s_mqtt_attributes, sizeof(struct mqtt), (void (*)(void *)) glue_get_mqtt, (void (*)(void *)) glue_set_mqtt};
-struct apihandler_data s_apihandler_rs485 = {{"rs485", "data", false, 0, 0, 0UL}, s_rs485_attributes, sizeof(struct rs485), (void (*)(void *)) glue_get_rs485, (void (*)(void *)) glue_set_rs485};
-struct apihandler_data s_apihandler_uchet = {{"uchet", "data", false, 0, 0, 0UL}, s_uchet_attributes, sizeof(struct uchet), (void (*)(void *)) glue_get_uchet, (void (*)(void *)) glue_set_uchet};
-struct apihandler_data s_apihandler_rest = {{"rest", "data", false, 0, 0, 0UL}, s_rest_attributes, sizeof(struct rest), (void (*)(void *)) glue_get_rest, (void (*)(void *)) glue_set_rest};
+static struct apihandler_data s_apihandler_wifi = {{"wifi", "data", false, 0, 0, 0UL}, s_wifi_attributes, sizeof(struct wifi), (void (*)(void *)) glue_get_wifi, (void (*)(void *)) glue_set_wifi};
+static struct apihandler_data s_apihandler_mqtt = {{"mqtt", "data", false, 0, 0, 0UL}, s_mqtt_attributes, sizeof(struct mqtt), (void (*)(void *)) glue_get_mqtt, (void (*)(void *)) glue_set_mqtt};
+static struct apihandler_data s_apihandler_rs485 = {{"rs485", "data", false, 0, 0, 0UL}, s_rs485_attributes, sizeof(struct rs485), (void (*)(void *)) glue_get_rs485, (void (*)(void *)) glue_set_rs485};
+static struct apihandler_data s_apihandler_uchet = {{"uchet", "data", false, 0, 0, 0UL}, s_uchet_attributes, sizeof(struct uchet), (void (*)(void *)) glue_get_uchet, (void (*)(void *)) glue_set_uchet};
+static struct apihandler_data s_apihandler_rest = {{"rest", "data", false, 0, 0, 0UL}, s_rest_attributes, sizeof(struct rest), (void (*)(void *)) glue_get_rest, (void (*)(void *)) glue_set_rest};
 
 static struct apihandler *s_apihandlers[] = {
   (struct apihandler *) &s_apihandler_wifi,
@@ -468,8 +468,9 @@ static void handle_object(struct mg_connection *c, struct mg_http_message *hm,
   void *data = calloc(1, h->data_size);
   h->getter(data);
   if (hm->body.len > 0 && h->data_size > 0) {
-    char *tmp = calloc(1, h->data_size);
-    size_t i;
+   // char *tmp = calloc(1, h->data_size);
+   char *tmp = (char *)calloc(1, h->data_size); 
+   size_t i;
     memcpy(tmp, data, h->data_size);
     for (i = 0; h->attributes[i].name != NULL; i++) {
       const struct attribute *a = &h->attributes[i];

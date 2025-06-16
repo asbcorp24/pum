@@ -3,8 +3,9 @@
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <PubSubClient.h>
- 
-#include <mongoose.h>
+ #include "mongoose/mongoose_glue.h"
+//#include "mongoose/mongoose_impl.c"
+//#include "mongoose/mongoose.h"
  
 #include "utils/ConfigManager.h"
 #include "utils/RS485Manager.h"
@@ -185,14 +186,30 @@ void startServerMode() {
 
   // 5. Инициализация Mongoose (для обоих состояний: AP и ONLINE)
  // mg_mgr_init(&mongoose_mgr);
- mg_mgr_init(&mongoose_mgr );
+ /*mg_mgr_init(&mongoose_mgr );
   s_http_server = mg_http_listen(&mongoose_mgr, "http://0.0.0.0:80", mongooseEventHandler, NULL);
-  //s_http_server = mg_http_listen_http(&mongoose_mgr,"0.0.0.0:80",mongooseEventHandler,NULL);
+  //s_http_server = mg_http_listen_http(&mongoose_mgr,"0.0.0.0:80",mongooseEventHandler,NULL);*/
+   mongoose_init();
+ mongoose_set_http_handlers("wifi",  glue_get_wifi,  glue_set_wifi);
+ mongoose_set_http_handlers("mqtt",  glue_get_mqtt,  glue_set_mqtt);
+ mongoose_set_http_handlers("rs485", glue_get_rs485, glue_set_rs485);
+ mongoose_set_http_handlers("uchet", glue_get_uchet,  glue_set_uchet);
+ mongoose_set_http_handlers("rest",  glue_get_rest,   glue_set_rest);
+ // (при необходимости можно добавить кастомные file/ota/action handlers)
+ Serial.println("[Server][MongooseGlue] HTTP-API зарегистрированы.");
+// Регистрация ручных кастомных эндпоинтов (если нужно):
+mongoose_set_http_handlers("getConfig", glue_get_wifi, glue_set_wifi);
+mongoose_set_http_handlers("setConfig", glue_set_mqtt, glue_set_mqtt);
+// … добавьте все необходимые что генерировал wiz­ard.json …
+
+// Если у вас есть POST-файловая загрузка OTA:
+mongoose_set_http_handlers("ota", glue_get_rest, glue_set_rest);
+/*
   if (s_http_server == NULL) {
     Serial.println("[Server][Mongoose] Ошибка запуска веб-сервера.");
   } else {
     Serial.println("[Server][Mongoose] Веб-сервер запущен на порт 80.");
-  }
+  }*/
 
   // 6. Инициализация MQTT (кем бы мы ни были: ONLINE или AP)
   //mqttClient.begin(cfgManager.getMQTTServer(), cfgManager.getMQTTPort(), wifiClient);
@@ -277,7 +294,9 @@ void startServerMode() {
 void serverMongooseTask(void *pvParameters) {
   (void) pvParameters;
   for (;;) {
-    mg_mgr_poll(&mongoose_mgr, 50); // 50 ms тайм-аут
+   // mg_mgr_poll(&mongoose_mgr, 50); // 50 ms тайм-аут
+    mongoose_poll();
+  vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
@@ -696,7 +715,7 @@ void clientDisplayTask(void *pvParameters) {
 // -----------------------------------------------------------------------------
 // === Обработчик HTTP-запросов Mongoose (для обоих режимов) ===
 void mongooseEventHandler(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
-  if (ev == MG_EV_HTTP_MSG) {
+ /* if (ev == MG_EV_HTTP_MSG) {
     struct mg_http_message *hm = (struct mg_http_message *) ev_data;
 
     if (mg_http_match_uri(hm, "/")) {
@@ -733,5 +752,5 @@ void mongooseEventHandler(struct mg_connection *c, int ev, void *ev_data, void *
     else {
       mg_http_reply(c, 404, "", "Not Found");
     }
-  }
+  }*/
 }
