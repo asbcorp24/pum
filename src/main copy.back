@@ -28,9 +28,7 @@
 
 #define AP_SSID             "ESP32_MILK_SERVER"
 #define AP_PASSWORD         "12345678"
-#define TFT_CS   5
-#define TFT_DC   2
-#define TFT_RST  15
+
 
 static String lastCowID = "";  // будет хранить последний отсканированный ID
 
@@ -48,7 +46,7 @@ RESTManager        restClient;      // Класс для REST-загрузки �
 RFIDManager        rfid;            // Класс для RFID-считывания
 MilkSensor         milkSensor;      // Класс для датчика молока
 ArchiveManager     archiveMgr;      // Класс для архива (SPIFFS)
-DisplayManager displayMgr(TFT_CS, TFT_DC, TFT_RST);    // Класс для LVGL-экрана
+DisplayManager     displayMgr;      // Класс для LVGL-экрана
 
 WiFiClient         wifiClient;
 PubSubClient       clientMQTT(wifiClient);
