@@ -123,7 +123,24 @@ void ConfigManager::saveConfigFromJSON(const String& jsonStr) {
         _saveString(KEY_REST_URL, rur);
     }
 }
-
+void ConfigManager::saveWiFiCredentials(const String& ssid, const String& password) {
+    // Сохраняем SSID
+    if (ssid.length() > 0) {
+        _prefs.putString(KEY_SSID, ssid);
+    } else {
+        _prefs.remove(KEY_SSID);
+    }
+    // Сохраняем пароль
+    if (password.length() > 0) {
+        _prefs.putString(KEY_PASSWORD, password);
+    } else {
+        _prefs.remove(KEY_PASSWORD);
+    }
+}
+void ConfigManager::commit() {
+    _prefs.end();
+    _prefs.begin("milk_cfg", false);  // замените "milk_cfg", если другой ns
+}
 // Сохраняет строку в Preferences
 void ConfigManager::_saveString(const char* key, const String& value) {
     if (value.length() > 0) {
@@ -146,4 +163,27 @@ void ConfigManager::_saveUInt32(const char* key, uint32_t value) {
 // Читает uint32_t из Preferences, если нет — возвращает defaultValue
 uint32_t ConfigManager::_getUInt32(const char* key, uint32_t defaultValue)  {
     return _prefs.getUInt(key, defaultValue);
+}
+void ConfigManager::saveRS485ID(const String& id) {
+    _saveString(KEY_RS485_ID, id);
+}
+
+void ConfigManager::saveRS485Baud(uint32_t baud) {
+    _saveUInt32(KEY_RS485_BAUD, baud);
+}
+
+void ConfigManager::saveMQTTServer(const String& addr) {
+    _saveString(KEY_MQTT_SERVER, addr);
+}
+
+void ConfigManager::saveMQTTUser(const String& user) {
+    _saveString(KEY_MQTT_USER, user);
+}
+
+void ConfigManager::saveMQTTPass(const String& pass) {
+    _saveString(KEY_MQTT_PASS, pass);
+}
+
+void ConfigManager::saveRESTURL(const String& url) {
+    _saveString(KEY_REST_URL, url);
 }

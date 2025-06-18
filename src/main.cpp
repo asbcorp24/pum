@@ -202,6 +202,8 @@ void startServerMode() {
  mongoose_set_http_handlers("rs485", glue_get_rs485, glue_set_rs485);
  mongoose_set_http_handlers("uchet", glue_get_uchet,  glue_set_uchet);
  mongoose_set_http_handlers("rest",  glue_get_rest,   glue_set_rest);
+
+
  // (при необходимости можно добавить кастомные file/ota/action handlers)
  Serial.println("[Server][MongooseGlue] HTTP-API зарегистрированы.");
 // Регистрация ручных кастомных эндпоинтов (если нужно):
@@ -321,7 +323,17 @@ void serverRS485Task(void *pvParameters) {
 
       // Сохраняем «сырую» информацию в архив
       //archiveMgr.addServerRecord(pkt.client_id, pkt.cow_id, pkt.liters, pkt.timestamp, "pending");
-      ArchiveRecord r{pkt.cow_id, pkt.timestamp, pkt.liters, pkt.ec, 0};
+      /*
+      struct ArchiveRecord {
+    uint32_t   client_id;   // номер ПУМ
+    uint32_t cow_id;
+    uint32_t timestamp;
+    float    volume;
+    float    ec;       // электр.проводимость, мСм/см
+    uint8_t  status; // 0 = pending, 1 = sent, 2 = error
+};
+      */
+      ArchiveRecord r{pkt.client_id,pkt.cow_id, pkt.timestamp, pkt.liters, pkt.ec, 0};
       archiveMgr.add(r);
       Serial.printf("[ServerRS485] client=%u, cow=%lu, vol=%.2f L, ec=%.2f\n", pkt.client_id,pkt.cow_id, pkt.liters,pkt.ec);
       // Обновляем счётчик уникальных клиентов и последние данные

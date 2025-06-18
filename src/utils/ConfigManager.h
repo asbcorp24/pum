@@ -141,8 +141,17 @@ public:
      * 
      * @param jsonStr JSON с обновлёнными параметрами.
      */
-    void saveConfigFromJSON(const String& jsonStr);
 
+ 
+    void saveConfigFromJSON(const String& jsonStr);
+  void saveWiFiCredentials(const String& ssid, const String& password);   
+  void saveRS485ID(const String& id);
+void saveRS485Baud(uint32_t baud);
+void saveMQTTServer(const String& addr);
+void saveMQTTUser(const String& user);
+void saveMQTTPass(const String& pass);
+void saveRESTURL(const String& url);
+    void commit();  
     // Публичные поля для прямого доступа (если нужно)
     String savedSSID;
     String savedPassword;
